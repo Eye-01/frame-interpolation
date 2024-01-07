@@ -87,6 +87,10 @@ _PATTERN = flags.DEFINE_string(
     default=None,
     help='The pattern to determine the directories with the input frames.',
     required=True)
+_OUTPUT_DIR = flags.DEFINE_string(
+    name='output_dir',
+    default='./interpolated_frames',
+    help='The folder path to save the generated frames.')			
 _MODEL_PATH = flags.DEFINE_string(
     name='model_path',
     default=None,
@@ -136,16 +140,20 @@ def _output_frames(frames: List[np.ndarray], frames_dir: str):
 
   """
   if tf.io.gfile.isdir(frames_dir):
-    old_frames = tf.io.gfile.glob(f'{frames_dir}/frame_*.png')
+    #old_frames = tf.io.gfile.glob(f'{frames_dir}/frame_*.png')
+    old_frames = tf.io.gfile.glob(os.path.join(frames_dir, '*.png'))	
     if old_frames:
-      logging.info('Removing existing frames from %s.', frames_dir)
-      for old_frame in old_frames:
-        tf.io.gfile.remove(old_frame)
+      #logging.info('Removing existing frames from %s.', frames_dir)
+      logging.info('Warning, existing frames in %s.', frames_dir)	  
+      #for old_frame in old_frames:
+      #  tf.io.gfile.remove(old_frame)
+
   else:
     tf.io.gfile.makedirs(frames_dir)
   for idx, frame in tqdm(
       enumerate(frames), total=len(frames), ncols=100, colour='green'):
-    util.write_image(f'{frames_dir}/frame_{idx:03d}.png', frame)
+    #util.write_image(f'{frames_dir}/frame_{idx:03d}.png', frame)
+    util.write_image(os.path.join(frames_dir, f'{idx:08d}.png'), frame)	
   logging.info('Output frames saved in %s.', frames_dir)
 
 
@@ -167,11 +175,14 @@ class ProcessDirectory(beam.DoFn):
         for ext in _INPUT_EXT
     ]
     input_frames = functools.reduce(lambda x, y: x + y, input_frames_list)
+    logging.debug(f"{len(input_frames)} frames detected.")	
     logging.info('Generating in-between frames for %s.', directory)
     frames = list(
         util.interpolate_recursively_from_files(
             input_frames, _TIMES_TO_INTERPOLATE.value, self.interpolator))
-    _output_frames(frames, f'{directory}/interpolated_frames')
+    #_output_frames(frames, f'{directory}/interpolated_frames')
+    _output_frames(frames, _OUTPUT_DIR.value)	
+    directory=_OUTPUT_DIR.value	
     if _OUTPUT_VIDEO.value:
       media.write_video(f'{directory}/interpolated.mp4', frames, fps=_FPS.value)
       logging.info('Output video saved at %s/interpolated.mp4.', directory)
