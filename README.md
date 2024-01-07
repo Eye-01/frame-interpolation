@@ -1,3 +1,21 @@
+## Change Log ([@Eye-01](https://www.github.com/eye-01))
+**Jan-07-2024**
+* Upgraded eval.interpolator_cli to add `--output_dir` parameter
+* removed the forced output folder cleaning (which is not of the application responsability).<br>
+* Updated requirements.txt to fit 2024 default installed packages in Colab.
+
+*Usage example :* <br>
+
+```
+!python -m frame-interpolation.eval.interpolator_cli \
+   --pattern /content/inframes \
+   --output_dir /content/outframes \
+   --model_path ./saved_model \
+   --times_to_interpolate 2
+```
+
+Below is the original readme :
+------------
 # FILM: Frame Interpolation for Large Motion
 
 ### [Website](https://film-net.github.io/) | [Paper](https://arxiv.org/pdf/2202.04901.pdf) | [Google AI Blog](https://ai.googleblog.com/2022/10/large-motion-frame-interpolation.html) | [Tensorflow Hub Colab](https://www.tensorflow.org/hub/tutorials/tf_hub_film_example) | [YouTube](https://www.youtube.com/watch?v=OAD-BieIjH4) <br>
