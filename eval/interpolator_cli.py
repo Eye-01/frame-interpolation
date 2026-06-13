@@ -160,6 +160,7 @@ def _output_frames(frames: List[np.ndarray], frames_dir: str):
 class ProcessDirectory(beam.DoFn):
   """DoFn for running the interpolator on a single directory at the time."""
 
+  '''
   def setup(self):
     self.interpolator = interpolator_lib.Interpolator(
         _MODEL_PATH.value, _ALIGN.value,
@@ -168,6 +169,19 @@ class ProcessDirectory(beam.DoFn):
     if _OUTPUT_VIDEO.value:
       ffmpeg_path = util.get_ffmpeg_path()
       media.set_ffmpeg(ffmpeg_path)
+  '''
+  def setup(self):
+    # Force un seul thread pour éviter les problèmes de concurrence
+    os.environ['TF_NUM_THREADS'] = '1'
+    os.environ['OMP_NUM_THREADS'] = '1'
+    
+    self.interpolator = interpolator_lib.Interpolator(
+        _MODEL_PATH.value, _ALIGN.value,
+        [_BLOCK_HEIGHT.value, _BLOCK_WIDTH.value])  
+		
+    if _OUTPUT_VIDEO.value:
+      ffmpeg_path = util.get_ffmpeg_path()
+      media.set_ffmpeg(ffmpeg_path)		
 
   def process(self, directory: str):
     input_frames_list = [
@@ -187,7 +201,7 @@ class ProcessDirectory(beam.DoFn):
       media.write_video(f'{directory}/interpolated.mp4', frames, fps=_FPS.value)
       logging.info('Output video saved at %s/interpolated.mp4.', directory)
 
-
+'''
 def _run_pipeline() -> None:
   directories = tf.io.gfile.glob(_PATTERN.value)
   pipeline = beam.Pipeline('DirectRunner')
@@ -196,8 +210,37 @@ def _run_pipeline() -> None:
 
   result = pipeline.run()
   result.wait_until_finish()
+'''
 
-
+def _run_pipeline() -> None:
+	directories = tf.io.gfile.glob(_PATTERN.value)
+	logging.info(f"Found {len(directories)} directories to process.")
+	
+	# On utilise directement l'interpolator sans Beam (beaucoup plus stable)
+	interpolator = interpolator_lib.Interpolator(
+		_MODEL_PATH.value, 
+		_ALIGN.value,
+		[_BLOCK_HEIGHT.value, _BLOCK_WIDTH.value])
+	
+	for directory in tqdm(directories, desc="Processing directories"):
+		logging.info('Generating in-between frames for %s.', directory)
+		
+		input_frames_list = [
+			natsort.natsorted(tf.io.gfile.glob(f'{directory}/*.{ext}'))
+			for ext in _INPUT_EXT
+		]
+		input_frames = functools.reduce(lambda x, y: x + y, input_frames_list)
+		
+		frames = list(
+			util.interpolate_recursively_from_files(
+				input_frames, _TIMES_TO_INTERPOLATE.value, interpolator))
+		
+		_output_frames(frames, _OUTPUT_DIR.value)
+		
+		if _OUTPUT_VIDEO.value:
+			media.write_video(f'{_OUTPUT_DIR.value}/interpolated.mp4', frames, fps=_FPS.value)
+  
+  
 def main(argv: Sequence[str]) -> None:
   if len(argv) > 1:
     raise app.UsageError('Too many command-line arguments.')
